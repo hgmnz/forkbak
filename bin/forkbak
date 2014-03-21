@@ -31,7 +31,6 @@ module Forkbak
   end
 
   def self.wait_for_database(config_var)
-    available = false
     loop do
       begin
         resolved_database_url = self.database_url(config_var)
