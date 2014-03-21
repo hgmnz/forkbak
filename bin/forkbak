@@ -128,11 +128,6 @@ module Forkbak
   end
 end
 
-def log(msg)
-  puts "#{Time.now}: #{msg}"
-end
-
-
 def run
   start = Time.now
   log "Creating database"
