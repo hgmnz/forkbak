@@ -1,0 +1,7 @@
+#!/usr/bin/env ruby
+#
+require 'heroku-api'
+
+heroku = Heroku::API.new(api_key: ENV.fetch("HEROKU_API_KEY"))
+
+heroku.post_ps(ENV['APP'], 'bundle exec bin/forkbak')

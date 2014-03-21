@@ -1,0 +1,20 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    excon (0.32.1)
+    heroku-api (0.3.17)
+      excon (~> 0.27)
+      multi_json (~> 1.8.2)
+    mime-types (2.2)
+    multi_json (1.8.4)
+    pg (0.17.1)
+    rest-client (1.6.7)
+      mime-types (>= 1.16)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  heroku-api
+  pg
+  rest-client
