@@ -25,9 +25,7 @@ module Forkbak
 
   def self.database_url(config_var)
     config = heroku.get_config_vars(ENV['APP']).body
-    url =  config[config_var]
-    puts "self.database_url - Found URL: #{url} (((config: #{config})))"
-    url
+    config[config_var]
   end
 
   def self.wait_for_database(config_var)
@@ -49,7 +47,6 @@ module Forkbak
         ]
         conn = PG::Connection.open(*params)
         result = conn.exec("SELECT pg_is_in_recovery()").values
-        puts "pg_is_in_recovery result: #{result}"
         break if result[0][0] == 'f'
         puts "still waiting, pg is in recovery"
       rescue =>e
@@ -130,17 +127,16 @@ end
 
 def run
   start = Time.now
-  log "Creating database"
+  puts "Creating database"
   config_var = Forkbak.create_database
-  log "Waiting for database to be available: #{config_var}"
+  puts "Waiting for database to be available: #{config_var}"
   Forkbak.wait_for_database(config_var)
-  log "Creating backup"
+  puts "Creating backup"
   transfer_id = Forkbak.create_backup(config_var)
-  log "Waiting for backup to complete"
+  puts "Waiting for backup to complete"
   Forkbak.wait_for_backup(config_var, transfer_id)
-  log "Done, took #{Time.now - start}"
+  puts "Done, took #{Time.now - start}"
   # Forkbak.destroy_database(database_url)
 end
 
-puts "gonna start here!"
 run
