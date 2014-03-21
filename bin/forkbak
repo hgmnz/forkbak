@@ -61,19 +61,34 @@ module Forkbak
   def self.create_backup(config_var)
     database_url = self.database_url(config_var)
     pgbackups = Forkbak::PGBackupsClient.new(from_url: database_url)
-    until transfer_id = pgbackups.transfer!
-      sleep 10
-      puts "Could not initiate transfer, retrying"
-      transfer_id
+    loop do
+      if transfer_id = pgbackups.transfer!
+        return transfer_id
+      else
+        sleep 10
+        puts "Could not initiate transfer, retrying"
+      end
     end
   end
 
   def self.wait_for_backup(config_var, transfer_id)
+    puts "waiting for backup to finish (#{transfer_id})"
     database_url = self.database_url(config_var)
     pgbackups = Forkbak::PGBackupsClient.new(from_url: database_url, transfer_id: transfer_id)
     until pgbackups.transfer_status == Forkbak::PGBackupsClient::StatusCompleted
-      sleep 10
       putc '.'
+      sleep 10
+    end
+    puts "Backup complete"
+  end
+
+  def self.destroy_database(config_var)
+    database_url = self.database_url(config_var)
+    loop do
+      response = heroku.delete_addon(ENV['APP'],
+                                     config_var.gsub(/_URL$/, ''))
+      config = heroku.get_config_vars(ENV['APP']).body
+      break if config[config_var].nil?
     end
   end
 end
@@ -133,10 +148,10 @@ def run
   Forkbak.wait_for_database(config_var)
   puts "Creating backup"
   transfer_id = Forkbak.create_backup(config_var)
-  puts "Waiting for backup to complete"
+  puts "Waiting for backup to complete (#{transfer_id})"
   Forkbak.wait_for_backup(config_var, transfer_id)
   puts "Done, took #{Time.now - start}"
-  # Forkbak.destroy_database(database_url)
+  Forkbak.destroy_database(config_var)
 end
 
 run
