@@ -15,7 +15,8 @@ module Forkbak
     database_to_fork = heroku.get_config_vars(ENV.fetch('FORK_FROM_APP')).body['DATABASE_URL']
     response = heroku.post_addon(ENV['APP'],
                                  "heroku-postgresql:mecha",
-                                 fork: database_to_fork)
+                                 fork: database_to_fork,
+                                 immediate: true)
     if (match = response.body["message"].match /HEROKU_POSTGRESQL_[A-Z]+_URL/)
       match[0]
     else
@@ -107,7 +108,8 @@ module Forkbak
           from_url:  @from_url,
           from_name: "AUTO_FORK",
           to_url:    nil,
-          to_name:   "BACKUP"
+          to_name:   "BACKUP",
+          expire:    true
         )
       )
       @transfer_id = result['id']
