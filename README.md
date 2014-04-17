@@ -43,6 +43,13 @@ it's API key in the `HEROKU_API_KEY` config var.
 
 *Recommended*: Add a logging addon to $APP.
 
+Running manually
+----------------
+
+```
+heroku run bundle exec bin/run --app $APP-backups
+```
+
 ## License
 
 forkbak is copyright (c) Harold Giménez and is released under the terms of the
