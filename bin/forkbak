@@ -50,8 +50,8 @@ module Forkbak
         result = conn.exec("SELECT pg_is_in_recovery()").values
         break if result[0][0] == 'f'
         puts "still waiting, pg is in recovery"
-      rescue PGL::ConnectionBad => e
-        if e.message ~= /Is the server running on host|the database system is starting up|could not connect to server/
+      rescue PG::ConnectionBad => e
+        if e.message =~ /Is the server running on host|the database system is starting up|could not connect to server/
           puts "DB preparing"
         else
           raise
