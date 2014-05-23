@@ -53,6 +53,8 @@ module Forkbak
       rescue PG::ConnectionBad => e
         if e.message =~ /Is the server running on host|the database system is starting up|could not connect to server/
           puts "DB preparing"
+        elsif e.message =~/password authentication failed for user/
+          puts "Unable to connect - bad creds? Retrying"
         else
           raise
         end
@@ -152,14 +154,19 @@ def run
   start = Time.now
   puts "Creating database"
   config_var = Forkbak.create_database
-  puts "Waiting for database to be available: #{config_var}"
-  Forkbak.wait_for_database(config_var)
-  puts "Creating backup"
-  transfer_id = Forkbak.create_backup(config_var)
-  puts "Waiting for backup to complete (#{transfer_id})"
-  Forkbak.wait_for_backup(config_var, transfer_id)
-  puts "Done, took #{Time.now - start}"
-  Forkbak.destroy_database(config_var)
+  begin
+    puts "Waiting for database to be available: #{config_var}"
+    Forkbak.wait_for_database(config_var)
+    puts "Creating backup"
+    transfer_id = Forkbak.create_backup(config_var)
+    puts "Waiting for backup to complete (#{transfer_id})"
+    Forkbak.wait_for_backup(config_var, transfer_id)
+  rescue => e
+    puts "Failed to take backup: #{e.class} - #{e.message}"
+  ensure
+    puts "Done, took #{Time.now - start}"
+    Forkbak.destroy_database(config_var)
+  end
 end
 
 run
