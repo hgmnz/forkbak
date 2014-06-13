@@ -16,7 +16,7 @@ module Forkbak
     response = heroku.post_addon(ENV['APP'],
                                  "heroku-postgresql:mecha",
                                  fork: database_to_fork,
-                                 immediate: true)
+                                 fast: true)
     if (match = response.body["message"].match /HEROKU_POSTGRESQL_[A-Z]+_URL/)
       match[0]
     else
