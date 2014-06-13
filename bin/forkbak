@@ -56,7 +56,7 @@ module Forkbak
         elsif e.message =~ /password authentication failed for user/
           puts "Unable to connect - bad creds? Retrying"
         elsif e.message =~ /could not translate host name/
-          puts "Unable to connect, DNS issuess. Retrying"
+          puts "Unable to connect, DNS issues. Retrying"
         else
           raise
         end
