@@ -14,7 +14,7 @@ module Forkbak
   def self.create_database
     database_to_fork = heroku.get_config_vars(ENV.fetch('FORK_FROM_APP')).body['DATABASE_URL']
     response = heroku.post_addon(ENV['APP'],
-                                 "heroku-postgresql:mecha",
+                                 "heroku-postgresql:standard-5",
                                  fork: database_to_fork,
                                  fast: true)
     if (match = response.body["message"].match /HEROKU_POSTGRESQL_[A-Z]+_URL/)
