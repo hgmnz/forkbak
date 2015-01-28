@@ -3,6 +3,19 @@ Forkbak
 
 Creates backups of a recent fork of your primary Heroku Postgres database.
 
+WARNING
+=======
+
+1. This script creates forks of your database to take a backup and then
+   destroys it. This is a regular fork, and as such it will incur costs on your
+   heroku account.
+2. Your Heroku Postgres database is protected by [Continuous
+   Protection](https://devcenter.heroku.com/articles/heroku-postgres-data-safety-and-continuous-protection)
+   which allow you to use
+   [Rollback](https://devcenter.heroku.com/articles/heroku-postgres-rollback) to
+   go to a prior database state, protecting against accidental data loss.
+   Therefore this approach is not strictly necessary.
+
 Usage
 -----
 
