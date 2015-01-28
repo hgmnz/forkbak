@@ -11,10 +11,11 @@ WARNING
    heroku account.
 2. Your Heroku Postgres database is protected by [Continuous
    Protection](https://devcenter.heroku.com/articles/heroku-postgres-data-safety-and-continuous-protection)
-   which allow you to use
+   which allows you to use
    [Rollback](https://devcenter.heroku.com/articles/heroku-postgres-rollback) to
    go to a prior database state, protecting against accidental data loss.
-   Therefore this approach is not strictly necessary.
+   Therefore this approach is not actually necessary for data protection
+   purposes.
 
 Usage
 -----
