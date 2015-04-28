@@ -89,13 +89,9 @@ module Forkbak
     puts "Backup complete"
   end
 
-  def self.destroy_database(config_var)
-    database_url = self.database_url(db['config_vars'].first)
-    loop do
-      response = heroku.delete_addon(ENV['APP'],
-                                     config_var.gsub(/_URL$/, ''))
-      config = heroku.get_config_vars(ENV['APP']).body
-      break if config[config_var].nil?
+  def self.destroy_databases
+    heroku.config_var.info(ENV.fetch('APP')).select { |k, v| v =~ /^postgres/ }.each do |k, v|
+      heroku.addon.destroy(ENV.fetch('APP'), k
     end
   end
 end
@@ -153,6 +149,8 @@ end
 
 def run
   start = Time.now
+  puts "Cleaning up leftover DBs"
+  Forkbak.destroy_databases
   puts "Creating database"
   db = Forkbak.create_database
   begin
@@ -166,7 +164,7 @@ def run
     puts "Failed to take backup: #{e.class} - #{e.message}"
   ensure
     puts "Done, took #{Time.now - start}"
-    Forkbak.destroy_database(db)
+    Forkbak.destroy_databases
   end
 end
 
