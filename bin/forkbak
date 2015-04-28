@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'rest_client'
-require 'heroku-api'
+require 'platform-api'
 require 'pg'
 
 $stdout.sync = true
@@ -90,7 +90,7 @@ module Forkbak
   end
 
   def self.destroy_database(config_var)
-    database_url = self.database_url(config_var)
+    database_url = self.database_url(db['config_vars'].first)
     loop do
       response = heroku.delete_addon(ENV['APP'],
                                      config_var.gsub(/_URL$/, ''))
@@ -157,7 +157,7 @@ def run
   db = Forkbak.create_database
   begin
     puts "Waiting for database to be available: #{config_var}"
-    Forkbak.wait_for_database(db['config_vars'.first)
+    Forkbak.wait_for_database(db['config_vars'].first)
     puts "Creating backup"
     transfer_id = Forkbak.create_backup(db['name'])
     puts "Waiting for backup to complete (#{transfer_id})"
@@ -166,7 +166,7 @@ def run
     puts "Failed to take backup: #{e.class} - #{e.message}"
   ensure
     puts "Done, took #{Time.now - start}"
-    Forkbak.destroy_database(config_var)
+    Forkbak.destroy_database(db)
   end
 end
 
