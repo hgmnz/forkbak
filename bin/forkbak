@@ -1,32 +1,29 @@
 #!/usr/bin/env ruby
 
 require 'rest_client'
-require 'heroku-api'
+require 'platform-api'
 require 'pg'
 
 $stdout.sync = true
 
 module Forkbak
   def self.heroku
-    Heroku::API.new(api_key: ENV.fetch("HEROKU_API_KEY"))
+    PlatformAPI.connect(ENV.fetch("HEROKU_API_KEY"))
   end
 
   def self.create_database
-    database_to_fork = heroku.get_config_vars(ENV.fetch('FORK_FROM_APP')).body['DATABASE_URL']
-    response = heroku.post_addon(ENV['APP'],
-                                 "heroku-postgresql:standard-5",
-                                 fork: database_to_fork,
-                                 fast: true)
-    if (match = response.body["message"].match /HEROKU_POSTGRESQL_[A-Z]+_URL/)
-      match[0]
-    else
-      raise StandardError, "Could not determine attachment URL"
-    end
+    database_to_fork = heroku.config_var.info(ENV.fetch('FORK_FROM_APP'))['DATABASE_URL']
+    heroku.addon.create(ENV['APP'], {
+      plan: "heroku-postgresql:standard-5",
+      config: {
+        fork: database_to_fork,
+        fast: true
+      }
+    })
   end
 
   def self.database_url(config_var)
-    config = heroku.get_config_vars(ENV['APP']).body
-    config[config_var]
+    heroku.config_var.info(ENV.fetch('APP'))[config_var]
   end
 
   def self.wait_for_database(config_var)
@@ -69,9 +66,8 @@ module Forkbak
     end
   end
 
-  def self.create_backup(config_var)
-    database_url = self.database_url(config_var)
-    pgbackups = Forkbak::PGBackupsClient.new(from_url: database_url)
+  def self.create_backup(db)
+    pgbackups = Forkbak::PGBackupsClient.new(db: db)
     loop do
       if transfer_id = pgbackups.transfer!
         return transfer_id
@@ -82,10 +78,8 @@ module Forkbak
     end
   end
 
-  def self.wait_for_backup(config_var, transfer_id)
-    puts "waiting for backup to finish (#{transfer_id})"
-    database_url = self.database_url(config_var)
-    pgbackups = Forkbak::PGBackupsClient.new(from_url: database_url, transfer_id: transfer_id)
+  def self.wait_for_backup(db, transfer_id)
+    pgbackups = Forkbak::PGBackupsClient.new(db: db, transfer_id: transfer_id)
     until pgbackups.transfer_status == Forkbak::PGBackupsClient::StatusCompleted
       putc '.'
       sleep 10
@@ -93,13 +87,11 @@ module Forkbak
     puts "Backup complete"
   end
 
-  def self.destroy_database(config_var)
-    database_url = self.database_url(config_var)
-    loop do
-      response = heroku.delete_addon(ENV['APP'],
-                                     config_var.gsub(/_URL$/, ''))
-      config = heroku.get_config_vars(ENV['APP']).body
-      break if config[config_var].nil?
+  def self.destroy_databases
+    heroku.addon.list(ENV.fetch('APP')).select do |addon|
+      addon['addon_service']['name'] == 'heroku-postgresql'
+    end.each do |addon|
+      heroku.addon.delete(ENV.fetch('APP'), addon['name'])
     end
   end
 end
@@ -107,29 +99,24 @@ end
 module Forkbak
   class PGBackupsClient
     def initialize(opts)
-      @pgbackups_url = ENV.fetch('PGBACKUPS_URL')
-      @from_url      = opts.fetch(:from_url)
-      @transfer_id   = opts[:transfer_id]
+      @db          = opts.fetch(:db)
+      @transfer_id = opts[:transfer_id]
     end
 
     def transfer!
       result = JSON.parse(
-        restclient_resource['/transfers'].post(
-          from_url:  @from_url,
-          from_name: "AUTO_FORK",
-          to_url:    nil,
-          to_name:   "BACKUP",
-          expire:    true
-        )
+        restclient_resource["/client/v11/databases/#{@db['name']}/backups"]
+          .post(expire: true)
       )
-      @transfer_id = result['id']
+      @transfer_id = result['uuid']
     rescue => e
+      puts "Error attempting transfer: ##{e.class}: #{e.message}"
       nil
     end
 
     def transfer_status
       response = JSON.parse(
-        restclient_resource["/transfers/#{@transfer_id}"].get
+        restclient_resource["/client/v11/databases/#{@db['name']}/transfers/#{@transfer_id}"].get
       )
       if response['errors']
         StatusError
@@ -146,28 +133,31 @@ module Forkbak
 
   private
     def restclient_resource
-      @client ||= RestClient::Resource.new(@pgbackups_url,
-              headers: { x_heroku_gem_version: '2.43.0' })
+      @restclient_resource ||= RestClient::Resource.new(
+          "https://:#{ENV['HEROKU_API_KEY']}@shogun.heroku.com"
+      )
     end
   end
 end
 
 def run
   start = Time.now
+  puts "Cleaning up leftover DBs"
+  Forkbak.destroy_databases
   puts "Creating database"
-  config_var = Forkbak.create_database
+  db = Forkbak.create_database
   begin
-    puts "Waiting for database to be available: #{config_var}"
-    Forkbak.wait_for_database(config_var)
+    puts "Waiting for database to become available"
+    Forkbak.wait_for_database(db['config_vars'].first)
     puts "Creating backup"
-    transfer_id = Forkbak.create_backup(config_var)
+    transfer_id = Forkbak.create_backup(db)
     puts "Waiting for backup to complete (#{transfer_id})"
-    Forkbak.wait_for_backup(config_var, transfer_id)
+    Forkbak.wait_for_backup(db, transfer_id)
   rescue => e
-    puts "Failed to take backup: #{e.class} - #{e.message}"
+    puts "Failed to take backup: #{e.class} - #{e.message}\n\n#{e.backtrace.join("\n")}"
   ensure
     puts "Done, took #{Time.now - start}"
-    Forkbak.destroy_database(config_var)
+    Forkbak.destroy_databases
   end
 end
 
