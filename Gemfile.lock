@@ -1,20 +1,37 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    excon (0.32.1)
-    heroku-api (0.3.17)
-      excon (~> 0.27)
-      multi_json (~> 1.8.2)
-    mime-types (2.2)
-    multi_json (1.8.4)
-    pg (0.17.1)
-    rest-client (1.6.7)
-      mime-types (>= 1.16)
+    domain_name (0.5.24)
+      unf (>= 0.0.5, < 1.0.0)
+    erubis (2.7.0)
+    excon (0.45.3)
+    heroics (0.0.14)
+      erubis (~> 2.7.0)
+      excon
+      moneta
+      multi_json (>= 1.9.2)
+      netrc
+    http-cookie (1.0.2)
+      domain_name (~> 0.5)
+    mime-types (2.5)
+    moneta (0.8.0)
+    multi_json (1.11.0)
+    netrc (0.10.3)
+    pg (0.18.1)
+    platform-api (0.2.0)
+      heroics (~> 0.0.10)
+    rest-client (1.8.0)
+      http-cookie (>= 1.0.2, < 2.0)
+      mime-types (>= 1.16, < 3.0)
+      netrc (~> 0.7)
+    unf (0.1.4)
+      unf_ext
+    unf_ext (0.0.7.1)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  heroku-api
   pg
+  platform-api
   rest-client
