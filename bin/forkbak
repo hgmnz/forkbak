@@ -8,7 +8,10 @@ $stdout.sync = true
 
 module Forkbak
   def self.heroku
-    PlatformAPI.connect(ENV.fetch("HEROKU_API_KEY"))
+    PlatformAPI.connect(
+      ENV.fetch("HEROKU_API_KEY"),
+      default_headers: {'Accept' => 'application/vnd.heroku+json; version=3.switzerland'}
+    )
   end
 
   def self.create_database
@@ -104,11 +107,12 @@ module Forkbak
     end
 
     def transfer!
-      result = JSON.parse(
+
+      response = JSON.parse(
         restclient_resource["/client/v11/databases/#{@db['name']}/backups"]
           .post(expire: true)
       )
-      @transfer_id = result['uuid']
+      @transfer_id = response['uuid']
     rescue => e
       puts "Error attempting transfer: ##{e.class}: #{e.message}"
       nil
