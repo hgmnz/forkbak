@@ -3,10 +3,35 @@
 require 'rest_client'
 require 'platform-api'
 require 'pg'
+require 'net/smtp'
+require "securerandom"
 
 $stdout.sync = true
 
 module Forkbak
+  def self.notify_error(text)
+    recipients = ENV['RECIPIENT_EMAILS'].split(/,/)
+    message = <<END_OF_MESSAGE
+From: Error <error@teamapp.com>
+To: #{recipients.join(', ')}
+Subject: DB Backup Error
+Date: #{Time.now}
+Message-Id: <SecureRandom.base64(20)@example.com>
+
+#{text}
+END_OF_MESSAGE
+
+    server = 'smtp.sendgrid.net'
+    port = 587
+    username = ENV['SENDGRID_USERNAME']
+    password = ENV['SENDGRID_PASSWORD']
+
+    smtp = Net::SMTP.new(server, port)
+    smtp.enable_starttls_auto
+    smtp.start('heroku.com', username, password, :plain)
+    smtp.send_message(message, 'error@teamapp.com', recipients)
+  end
+
   def self.heroku
     PlatformAPI.connect(
       ENV.fetch("HEROKU_API_KEY"),
@@ -17,7 +42,7 @@ module Forkbak
   def self.create_database
     database_to_fork = heroku.config_var.info(ENV.fetch('FORK_FROM_APP'))['DATABASE_URL']
     heroku.addon.create(ENV['APP'], {
-      plan: "heroku-postgresql:standard-5",
+      plan: "heroku-postgresql:standard-2",
       config: {
         fork: database_to_fork,
         fast: true
@@ -30,6 +55,7 @@ module Forkbak
   end
 
   def self.wait_for_database(config_var)
+    count = 0
     loop do
       begin
         resolved_database_url = self.database_url(config_var)
@@ -52,16 +78,28 @@ module Forkbak
         puts "still waiting, pg is in recovery"
       rescue PG::ConnectionBad => e
         if e.message =~ /Is the server running on host|the database system is starting up|could not connect to server/
+          # NOTE: Phase 2: Catching up with the original database
           puts "DB preparing"
         elsif e.message =~ /password authentication failed for user/
+          count += 1
           puts "Unable to connect - bad creds? Retrying"
+
+          # Apparently we might get this error even though we've got the credentials correct. Retry a few times to wait until DB is up.
+          if count > 25 
+            notify_error("Bad credentials")
+            break  # Don't retry
+          end
         elsif e.message =~ /could not translate host name/
+          # NOTE: Phase 1: This is expected a few times in the beginning because the newly create DB is not immediately ready.
           puts "Unable to connect, DNS issues. Retrying"
         else
           raise
         end
       rescue =>e
-        puts "still waiting: #{e.class}: #{e.message}"
+        message = "Error: #{e.message}"
+        puts message
+        notify_error(message)
+        break  # Don't retry
       ensure
         conn.close if conn
       end
@@ -145,6 +183,8 @@ module Forkbak
 end
 
 def run
+  #Forkbak.notify_error("Test database backup error notification")
+
   start = Time.now
   puts "Cleaning up leftover DBs"
   Forkbak.destroy_databases
@@ -158,7 +198,9 @@ def run
     puts "Waiting for backup to complete (#{transfer_id})"
     Forkbak.wait_for_backup(db, transfer_id)
   rescue => e
-    puts "Failed to take backup: #{e.class} - #{e.message}\n\n#{e.backtrace.join("\n")}"
+    message = "Failed to take backup: #{e.class} - #{e.message}\n\n#{e.backtrace.join("\n")}"
+    Forkbak.notify_error(message)
+    puts message
   ensure
     puts "Done, took #{Time.now - start}"
     Forkbak.destroy_databases
